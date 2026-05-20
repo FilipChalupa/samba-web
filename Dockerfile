@@ -1,21 +1,11 @@
-FROM alpine:3.20
+FROM python:3.12-slim
 
-RUN apk add --no-cache \
-    nginx \
-    samba-client \
-    tini
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
 
-RUN ln -sf /dev/stdout /var/log/nginx/access.log \
-    && ln -sf /dev/stderr /var/log/nginx/error.log
-
-RUN mkdir -p /data /run/nginx
-
-COPY nginx.conf /etc/nginx/http.d/default.conf
-COPY sync.sh /sync.sh
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /sync.sh /entrypoint.sh
+COPY server.py /server.py
 
 EXPOSE 80
+ENV PORT=80
 
-ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["/entrypoint.sh"]
+CMD ["python", "/server.py"]
