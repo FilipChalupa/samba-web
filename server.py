@@ -236,15 +236,14 @@ def _fmt_size(n: int) -> str:
 
 
 if __name__ == '__main__':
-    smbclient.ClientConfig(auth_protocol='ntlm')
-    smbclient.register_session(
-        SMB_HOST,
+    smbclient.ClientConfig(
         username=_smb_user,
         password=SMB_PASSWORD,
-        connection_timeout=30,
         auth_protocol='ntlm',
+        connection_timeout=30,
     )
     port = int(os.environ.get('PORT', '80'))
     addr = f'//{SMB_HOST}/{SMB_SHARE}' + (f'/{SMB_BASE}' if SMB_BASE else '')
     print(f'samba-web :{port} -> {addr}', flush=True)
+    print(f'auth: user={repr(_smb_user)}, password_set={bool(SMB_PASSWORD)}', flush=True)
     ThreadingHTTPServer(('0.0.0.0', port), Handler).serve_forever()
