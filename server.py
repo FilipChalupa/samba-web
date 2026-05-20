@@ -33,6 +33,11 @@ def to_smb_path(url_path: str) -> str:
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url_path = unquote(self.path.split('?')[0])
+
+        if url_path == '/healthz':
+            self._serve_health()
+            return
+
         smb_path = to_smb_path(url_path)
 
         try:
@@ -56,9 +61,17 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error(500, str(e))
         else:
             try:
-                self._serve_file(url_path, smb_path)
+                self._serve_file(url_path, smb_path, st.st_size)
             except Exception as e:
                 self.send_error(500, str(e))
+
+    def _serve_health(self):
+        body = b'ok'
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _serve_directory(self, url_path: str, smb_path: str):
         entries = []
@@ -78,17 +91,69 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _serve_file(self, url_path: str, smb_path: str):
+    def _serve_file(self, url_path: str, smb_path: str, size: int):
         mime, _ = mimetypes.guess_type(url_path)
-        self.send_response(200)
-        self.send_header('Content-Type', mime or 'application/octet-stream')
-        self.end_headers()
-        with smbclient.open_file(smb_path, mode='rb') as f:
-            while chunk := f.read(65536):
-                self.wfile.write(chunk)
+        content_type = mime or 'application/octet-stream'
+        range_header = self.headers.get('Range')
+
+        if range_header:
+            start, end = _parse_range(range_header, size)
+            if start is None:
+                self.send_response(416)
+                self.send_header('Content-Range', f'bytes */{size}')
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+                return
+            length = end - start + 1
+            self.send_response(206)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(length))
+            self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+            self.send_header('Accept-Ranges', 'bytes')
+            self.end_headers()
+            with smbclient.open_file(smb_path, mode='rb') as f:
+                f.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = f.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+        else:
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(size))
+            self.send_header('Accept-Ranges', 'bytes')
+            self.end_headers()
+            with smbclient.open_file(smb_path, mode='rb') as f:
+                while chunk := f.read(65536):
+                    self.wfile.write(chunk)
 
     def log_message(self, fmt, *args):
         print(f'{self.address_string()} {fmt % args}', flush=True)
+
+
+def _parse_range(header: str, size: int) -> tuple[int | None, int | None]:
+    try:
+        unit, spec = header.split('=', 1)
+        if unit.strip() != 'bytes':
+            return None, None
+        spec = spec.strip()
+        if spec.startswith('-'):
+            suffix = int(spec[1:])
+            start, end = max(0, size - suffix), size - 1
+        elif spec.endswith('-'):
+            start, end = int(spec[:-1]), size - 1
+        else:
+            s, e = spec.split('-', 1)
+            start, end = int(s), int(e)
+        end = min(end, size - 1)
+        if start > end or start >= size:
+            return None, None
+        return start, end
+    except (ValueError, AttributeError):
+        return None, None
 
 
 def _render_listing(url_path: str, entries: list) -> str:
@@ -109,7 +174,7 @@ def _render_listing(url_path: str, entries: list) -> str:
         )
 
     return f'''<!DOCTYPE html>
-<html lang="cs">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
