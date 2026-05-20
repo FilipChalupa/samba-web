@@ -43,7 +43,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             st = smbclient.stat(smb_path)
         except SMBOSError as e:
-            self.send_error(404 if e.errno == errno.ENOENT else 503)
+            if e.errno == errno.ENOENT:
+                self._serve_404(url_path)
+            else:
+                self.send_error(503)
             return
         except Exception:
             self.send_error(503)
@@ -64,6 +67,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._serve_file(url_path, smb_path, st.st_size)
             except Exception as e:
                 self.send_error(500, str(e))
+
+    def _serve_404(self, url_path: str):
+        body = _render_404(url_path).encode('utf-8')
+        self.send_response(404)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _serve_health(self):
         body = b'ok'
@@ -156,6 +167,31 @@ def _parse_range(header: str, size: int) -> tuple[int | None, int | None]:
         return None, None
 
 
+def _html_page(title: str, body: str) -> str:
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{title}</title>
+<style>
+  body{{font-family:monospace;padding:1.5rem;background:light-dark(#fff,#1a1a1a);color:light-dark(#222,#ddd)}}
+  h1{{font-size:1.1rem;margin-bottom:1rem;word-break:break-all}}
+  table{{border-collapse:collapse}}
+  td{{padding:.2rem 1.5rem .2rem 0;white-space:nowrap}}
+  .sz{{color:#888;text-align:right}}
+  a{{color:light-dark(#1a6,#4db);text-decoration:none}}
+  a:hover{{text-decoration:underline}}
+  .muted{{color:#888}}
+</style>
+</head>
+<body>
+{body}
+</body>
+</html>'''
+
+
 def _render_listing(url_path: str, entries: list) -> str:
     title = html.escape(url_path)
     rows = []
@@ -173,28 +209,20 @@ def _render_listing(url_path: str, entries: list) -> str:
             f'<td class="sz">{size}</td></tr>'
         )
 
-    return f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light dark">
-<title>Index of {title}</title>
-<style>
-  body{{font-family:monospace;padding:1.5rem;background:light-dark(#fff,#1a1a1a);color:light-dark(#222,#ddd)}}
-  h1{{font-size:1.1rem;margin-bottom:1rem;word-break:break-all}}
-  table{{border-collapse:collapse}}
-  td{{padding:.2rem 1.5rem .2rem 0;white-space:nowrap}}
-  .sz{{color:#888;text-align:right}}
-  a{{color:light-dark(#1a6,#4db);text-decoration:none}}
-  a:hover{{text-decoration:underline}}
-</style>
-</head>
-<body>
-<h1>Index of {title}</h1>
-<table>{''.join(rows)}</table>
-</body>
-</html>'''
+    return _html_page(
+        f'Index of {title}',
+        f'<h1>Index of {title}</h1><table>{"".join(rows)}</table>',
+    )
+
+
+def _render_404(url_path: str) -> str:
+    path = html.escape(url_path)
+    return _html_page(
+        '404 Not Found',
+        f'<h1>404 Not Found</h1>'
+        f'<p class="muted">{path}</p>'
+        f'<p><a href="/">← root</a></p>',
+    )
 
 
 def _fmt_size(n: int) -> str:
