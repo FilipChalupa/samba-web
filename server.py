@@ -236,6 +236,7 @@ def _fmt_size(n: int) -> str:
 
 
 if __name__ == '__main__':
+    smbclient.ClientConfig(auth_protocol='ntlm')
     smbclient.register_session(
         SMB_HOST,
         username=_smb_user,
