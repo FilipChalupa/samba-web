@@ -46,9 +46,11 @@ class Handler(BaseHTTPRequestHandler):
             if e.errno == errno.ENOENT:
                 self._serve_404(url_path)
             else:
+                print(f'SMB error for {smb_path}: {e}', flush=True)
                 self.send_error(503)
             return
-        except Exception:
+        except Exception as e:
+            print(f'Unexpected error for {smb_path}: {e}', flush=True)
             self.send_error(503)
             return
 
