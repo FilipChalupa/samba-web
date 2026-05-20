@@ -1,36 +1,35 @@
 # samba-web
 
-Docker image, který vystaví obsah Samba share jako statický HTTP server s directory listingem. Přístup na Samba probíhá on-demand — při každém requestu se přímo dotáže SMB serveru.
+Docker image that exposes a Samba share as an HTTP server with directory listing. Samba is accessed on-demand — every request talks to the SMB server directly, no local cache or sync.
 
-## Použití
+## Usage
 
 ```bash
 cp .env.example .env
-# vyplnit .env
+# fill in .env
 docker compose up --build
 ```
 
-Server běží na [http://localhost:8080](http://localhost:8080).
+Server runs at [http://localhost:8080](http://localhost:8080).
 
-## Env proměnné
+## Environment variables
 
-| Proměnná | Popis | Výchozí |
+| Variable | Description | Default |
 |---|---|---|
-| `SMB_HOST` | IP nebo hostname Samba serveru | **povinné** |
-| `SMB_SHARE` | Název share | **povinné** |
-| `SMB_USER` | Uživatelské jméno (`guest` = bez hesla) | `guest` |
-| `SMB_PASSWORD` | Heslo | prázdné |
-| `SMB_DOMAIN` | Doména / workgroup | prázdné |
-| `SMB_PATH` | Podsložka uvnitř share | `/` (root) |
-| `PORT` | Port HTTP serveru uvnitř kontejneru | `80` |
+| `SMB_HOST` | Samba server IP or hostname | **required** |
+| `SMB_SHARE` | Share name | **required** |
+| `SMB_USER` | Username (`guest` = no password) | `guest` |
+| `SMB_PASSWORD` | Password | empty |
+| `SMB_DOMAIN` | Domain / workgroup | empty |
+| `SMB_PATH` | Subdirectory within the share | `/` (root) |
+| `PORT` | HTTP port inside the container | `80` |
 
-## Nasazení přes Coolify
+## Deploying with Coolify
 
-Nasadit jako **Docker image** nebo **Dockerfile**. Env proměnné nastavit v Coolify UI. Port kontejneru: `80`.
+Deploy as a **Dockerfile**. Set environment variables in the Coolify UI. Container port: `80`.
 
-## Chování
+## Behaviour
 
-- **Složka** → HTML directory listing (načte se ze Samby při každém requestu)
-- **Soubor** → streamuje se přímo ze Samby do HTTP response (64 KB bloky)
-- Žádný lokální cache, žádný sync — vždy aktuální obsah
-- HTTP 404 pro neexistující cesty, HTTP 503 při výpadku SMB serveru
+- **Directory** → HTML directory listing fetched from Samba on each request
+- **File** → streamed directly from Samba to the HTTP response in 64 KB chunks
+- HTTP 404 for missing paths, HTTP 503 when the SMB server is unreachable
