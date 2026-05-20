@@ -178,14 +178,15 @@ def _render_listing(url_path: str, entries: list) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Index of {title}</title>
 <style>
-  body{{font-family:monospace;padding:1.5rem;background:#fff;color:#222}}
+  body{{font-family:monospace;padding:1.5rem;background:light-dark(#fff,#1a1a1a);color:light-dark(#222,#ddd)}}
   h1{{font-size:1.1rem;margin-bottom:1rem;word-break:break-all}}
   table{{border-collapse:collapse}}
   td{{padding:.2rem 1.5rem .2rem 0;white-space:nowrap}}
   .sz{{color:#888;text-align:right}}
-  a{{color:#1a6;text-decoration:none}}
+  a{{color:light-dark(#1a6,#4db);text-decoration:none}}
   a:hover{{text-decoration:underline}}
 </style>
 </head>
