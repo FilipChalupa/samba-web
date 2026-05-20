@@ -241,6 +241,7 @@ if __name__ == '__main__':
         username=_smb_user,
         password=SMB_PASSWORD,
         connection_timeout=30,
+        auth_protocol='ntlm',
     )
     port = int(os.environ.get('PORT', '80'))
     addr = f'//{SMB_HOST}/{SMB_SHARE}' + (f'/{SMB_BASE}' if SMB_BASE else '')
